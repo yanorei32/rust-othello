@@ -1,14 +1,64 @@
+use std::fmt::Display;
+use std::ops::Not;
+
 const BOARD_SIZE: usize = 8;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Player {
+    First,
+    Second,
+}
+
+impl Not for Player {
+    type Output = Self;
+
+    fn not(self) -> Self::Output {
+        match self {
+            Self::First => Self::Second,
+            Self::Second => Self::First,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CellState {
+    Empty,
+    First,
+    Second,
+}
+
+impl From<Player> for CellState {
+    fn from(p: Player) -> Self {
+        match p {
+            Player::First => CellState::First,
+            Player::Second => CellState::Second,
+        }
+    }
+}
+
+impl Display for CellState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                CellState::Empty => "-",
+                CellState::First => "○",
+                CellState::Second => "●",
+            }
+        )
+    }
+}
 
 #[derive(Debug, Clone, Copy)]
 struct Board {
-    state: [[usize; BOARD_SIZE]; BOARD_SIZE],
+    state: [[CellState; BOARD_SIZE]; BOARD_SIZE],
 }
 
 impl Board {
     fn new() -> Self {
         Self {
-            state: [[0; BOARD_SIZE]; BOARD_SIZE],
+            state: [[CellState::Empty; BOARD_SIZE]; BOARD_SIZE],
         }
     }
 
@@ -21,20 +71,16 @@ impl Board {
             return Err("Out of range.");
         }
 
-        Ok(self.state[y][x] == 0)
+        Ok(self.state[y][x] == CellState::Empty)
     }
 
-    fn put(&mut self, x: usize, y: usize, p: usize) -> Result<(), &'static str> {
+    fn put(&mut self, x: usize, y: usize, p: Player) -> Result<(), &'static str> {
         if !Board::is_inside_board(x, y) {
             return Err("Out of range.");
         }
 
-        if !(p == 1 || p == 2) {
-            return Err("p is not player value.");
-        }
-
         if self.is_free_space(x, y)? {
-            self.state[y][x] = p;
+            self.state[y][x] = p.into();
             self.frip(x, y, p);
         } else {
             return Err("Put point is not None.");
@@ -49,7 +95,7 @@ impl Board {
         target_y: usize,
         direction_x: isize,
         direction_y: isize,
-        p: usize,
+        p: Player,
         len: usize,
     ) -> usize {
         // 盤面の範囲外に出る際に検出してReturn
@@ -63,7 +109,7 @@ impl Board {
 
         if self.state[(target_y as isize + direction_y) as usize]
             [(target_x as isize + direction_x) as usize]
-            == Self::reversi_player_num(p)
+            == (!p).into()
         {
             // 指定した色とは反対の色を探す.これで挟まれている色を探索する.
             self.search(
@@ -77,7 +123,7 @@ impl Board {
         } else if len > 0
             && self.state[(target_y as isize + direction_y) as usize]
                 [(target_x as isize + direction_x) as usize]
-                == p
+                == p.into()
         {
             // len > 0 挟まれている色が検索によって存在するかつその先に指定された色があれば挟まれたと判定する
             len
@@ -87,7 +133,7 @@ impl Board {
         }
     }
 
-    fn frip(&mut self, x: usize, y: usize, p: usize) {
+    fn frip(&mut self, x: usize, y: usize, p: Player) {
         for dir in [
             [-1, -1],
             [-1, 0],
@@ -104,38 +150,22 @@ impl Board {
             for _ in 0..len {
                 pos_x += dir[0];
                 pos_y += dir[1];
-                self.state[pos_y as usize][pos_x as usize] = p;
+                self.state[pos_y as usize][pos_x as usize] = p.into();
             }
-        }
-    }
-
-    fn reversi_player_num(p: usize) -> usize {
-        match p {
-            1 => 2,
-            2 => 1,
-            _ => 0,
         }
     }
 
     fn put_first_board(&mut self) {
-        self.put(3, 3, 1).unwrap();
-        self.put(4, 3, 2).unwrap();
-        self.put(3, 4, 2).unwrap();
-        self.put(4, 4, 1).unwrap();
+        self.put(3, 3, Player::First).unwrap();
+        self.put(4, 3, Player::Second).unwrap();
+        self.put(3, 4, Player::Second).unwrap();
+        self.put(4, 4, Player::First).unwrap();
     }
 
     fn print(&self) {
-        for i in self.state {
-            for j in i {
-                match j {
-                    0 => print!(" -"),
-                    1 => print!(" ○"),
-                    2 => print!(" ●"),
-                    _ => panic!(),
-                }
-            }
-            println!();
-        }
+        self.state.iter().for_each(|row| {
+            println!(" {}", row.map(|v| v.to_string()).join(" "));
+        });
     }
 }
 
@@ -144,7 +174,7 @@ fn main() {
     board.put_first_board();
     board.print();
 
-    let mut p = 2;
+    let mut p = Player::Second;
     loop {
         let mut x = String::new();
         std::io::stdin().read_line(&mut x).unwrap();
@@ -169,6 +199,6 @@ fn main() {
         board.put(x, y, p).unwrap();
         board.print();
 
-        p = Board::reversi_player_num(p);
+        p = !p;
     }
 }
