@@ -6,20 +6,14 @@ struct Board {
 }
 
 impl Board {
-    fn new() -> Board {
-        Board {
+    fn new() -> Self {
+        Self {
             state: [[0; BOARD_SIZE]; BOARD_SIZE],
         }
     }
 
     fn is_inside_board(&self, x: usize, y: usize) -> bool {
-        if x > BOARD_SIZE - 1 || y > BOARD_SIZE - 1 {
-            return false;
-        }
-        /* else if x < 0 || y < 0 {
-            return false;
-        } */
-        true
+        !(x > BOARD_SIZE - 1 || y > BOARD_SIZE - 1)
     }
 
     fn is_free_space(&self, x: usize, y: usize) -> Result<bool, &'static str> {
@@ -27,11 +21,7 @@ impl Board {
             return Err("Out of range.");
         }
 
-        if self.state[y][x] == 0 {
-            return Ok(true);
-        } else {
-            return Ok(false);
-        }
+        Ok(self.state[y][x] == 0)
     }
 
     fn put(&mut self, x: usize, y: usize, p: usize) -> Result<(), &'static str> {
@@ -49,6 +39,7 @@ impl Board {
         } else {
             return Err("Put point is not None.");
         }
+
         Ok(())
     }
 
@@ -75,24 +66,24 @@ impl Board {
             == Self::reversi_player_num(p)
         {
             // 指定した色とは反対の色を探す.これで挟まれている色を探索する.
-            return self.search(
+            self.search(
                 (target_x as isize + direction_x) as usize,
                 (target_y as isize + direction_y) as usize,
                 direction_x,
                 direction_y,
                 p,
                 len + 1,
-            );
+            )
         } else if len > 0
             && self.state[(target_y as isize + direction_y) as usize]
                 [(target_x as isize + direction_x) as usize]
                 == p
         {
             // len > 0 挟まれている色が検索によって存在するかつその先に指定された色があれば挟まれたと判定する
-            return len;
+            len
         } else {
             // 何もなかった場合はReturn
-            return 0;
+            0
         }
     }
 
@@ -143,7 +134,7 @@ impl Board {
                     _ => panic!(),
                 }
             }
-            print!("\n");
+            println!();
         }
     }
 }
@@ -163,13 +154,10 @@ fn main() {
         let x = x.trim_end().to_owned().parse().unwrap_or(0);
         let y = y.trim_end().to_owned().parse().unwrap_or(0);
 
-        println!("({}, {})", x, y);
+        println!("({x}, {y})");
 
         if x > BOARD_SIZE - 1 || y > BOARD_SIZE - 1 {
-            println!(
-                "Out of range. Please select inside of BOARD_SIZE: {}",
-                BOARD_SIZE
-            );
+            println!("Out of range. Please select inside of BOARD_SIZE: {BOARD_SIZE}",);
             continue;
         }
 
