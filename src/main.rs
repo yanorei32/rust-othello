@@ -12,12 +12,12 @@ impl Board {
         }
     }
 
-    fn is_inside_board(&self, x: usize, y: usize) -> bool {
+    fn is_inside_board(x: usize, y: usize) -> bool {
         !(x > BOARD_SIZE - 1 || y > BOARD_SIZE - 1)
     }
 
     fn is_free_space(&self, x: usize, y: usize) -> Result<bool, &'static str> {
-        if !self.is_inside_board(x, y) {
+        if !Board::is_inside_board(x, y) {
             return Err("Out of range.");
         }
 
@@ -25,7 +25,7 @@ impl Board {
     }
 
     fn put(&mut self, x: usize, y: usize, p: usize) -> Result<(), &'static str> {
-        if !self.is_inside_board(x, y) {
+        if !Board::is_inside_board(x, y) {
             return Err("Out of range.");
         }
 
@@ -125,8 +125,8 @@ impl Board {
     }
 
     fn print(&self) {
-        for i in self.state.into_iter() {
-            for j in i.into_iter() {
+        for i in self.state {
+            for j in i {
                 match j {
                     0 => print!(" -"),
                     1 => print!(" ○"),
