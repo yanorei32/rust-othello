@@ -1,7 +1,63 @@
 use std::fmt::Display;
+use std::io::Write;
 use std::ops::Not;
 
 const BOARD_SIZE: usize = 8;
+
+#[derive(Debug, Clone, Copy)]
+struct Vector {
+    x: isize,
+    y: isize,
+}
+
+impl Vector {
+    fn new(x: isize, y: isize) -> Self {
+        Self { x, y }
+    }
+
+    fn is_zero(self) -> bool {
+        self.x == 0 && self.y == 0
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct Coordinate {
+    x: usize,
+    y: usize,
+}
+
+impl Coordinate {
+    #[must_use]
+    fn try_new(x: usize, y: usize) -> Result<Self, &'static str> {
+        if !(0..BOARD_SIZE).contains(&x) || !(0..BOARD_SIZE).contains(&y) {
+            return Err("Invalid coordinate");
+        }
+
+        Ok(Self { x, y })
+    }
+
+    #[must_use]
+    fn try_add(&self, v: Vector) -> Result<Self, &'static str> {
+        let add_isize = |vu: usize, vi: isize| -> Result<usize, &'static str> {
+            let vi_abs = usize::try_from(vi.abs()).unwrap();
+
+            if 0 < vi {
+                vu.checked_add(vi_abs)
+            } else {
+                vu.checked_sub(vi_abs)
+            }
+            .ok_or("Failed to add / sub isize")
+        };
+
+        Self::try_new(add_isize(self.x, v.x)?, add_isize(self.y, v.y)?)
+    }
+}
+
+impl Display for Coordinate {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({}, {})", self.x, self.y)
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Player {
@@ -27,6 +83,12 @@ enum CellState {
     Second,
 }
 
+impl CellState {
+    pub fn is_empty(&self) -> bool {
+        *self == Self::Empty
+    }
+}
+
 impl From<Player> for CellState {
     fn from(p: Player) -> Self {
         match p {
@@ -38,15 +100,11 @@ impl From<Player> for CellState {
 
 impl Display for CellState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                CellState::Empty => "-",
-                CellState::First => "○",
-                CellState::Second => "●",
-            }
-        )
+        match self {
+            CellState::Empty => write!(f, "-"),
+            CellState::First => write!(f, "○"),
+            CellState::Second => write!(f, "●"),
+        }
     }
 }
 
@@ -57,147 +115,120 @@ struct Board {
 
 impl Board {
     fn new() -> Self {
-        Self {
+        let mut b = Self {
             state: [[CellState::Empty; BOARD_SIZE]; BOARD_SIZE],
-        }
+        };
+
+        b.state[3][3] = Player::First.into();
+        b.state[3][4] = Player::Second.into();
+        b.state[4][3] = Player::Second.into();
+        b.state[4][4] = Player::First.into();
+
+        b
     }
 
-    fn is_inside_board(x: usize, y: usize) -> bool {
-        !(x > BOARD_SIZE - 1 || y > BOARD_SIZE - 1)
+    fn get_cell_mut(&mut self, c: Coordinate) -> &mut CellState {
+        &mut self.state[c.y][c.x]
     }
 
-    fn is_free_space(&self, x: usize, y: usize) -> Result<bool, &'static str> {
-        if !Board::is_inside_board(x, y) {
-            return Err("Out of range.");
-        }
-
-        Ok(self.state[y][x] == CellState::Empty)
+    fn get_cell(&self, c: Coordinate) -> &CellState {
+        &self.state[c.y][c.x]
     }
 
-    fn put(&mut self, x: usize, y: usize, p: Player) -> Result<(), &'static str> {
-        if !Board::is_inside_board(x, y) {
-            return Err("Out of range.");
+    fn put(&mut self, c: Coordinate, p: Player) -> Result<(), &'static str> {
+        if !self.get_cell(c).is_empty() {
+            return Err("Put point is not Empty.");
         }
 
-        if self.is_free_space(x, y)? {
-            self.state[y][x] = p.into();
-            self.frip(x, y, p);
-        } else {
-            return Err("Put point is not None.");
-        }
+        *self.get_cell_mut(c) = p.into();
+
+        self.frip(c, p);
 
         Ok(())
     }
 
-    fn search(
-        &self,
-        target_x: usize,
-        target_y: usize,
-        direction_x: isize,
-        direction_y: isize,
-        p: Player,
-        len: usize,
-    ) -> usize {
+    fn search(&self, at: Coordinate, dir: Vector, p: Player, len: usize) -> usize {
         // 盤面の範囲外に出る際に検出してReturn
-        if target_x == BOARD_SIZE - 1
-            || target_y == BOARD_SIZE - 1
-            || target_x == 0
-            || target_y == 0
-        {
+        let Ok(at) = at.try_add(dir) else {
             return 0;
-        }
+        };
 
-        if self.state[(target_y as isize + direction_y) as usize]
-            [(target_x as isize + direction_x) as usize]
-            == (!p).into()
-        {
+        match *self.get_cell(at) {
             // 指定した色とは反対の色を探す.これで挟まれている色を探索する.
-            self.search(
-                (target_x as isize + direction_x) as usize,
-                (target_y as isize + direction_y) as usize,
-                direction_x,
-                direction_y,
-                p,
-                len + 1,
-            )
-        } else if len > 0
-            && self.state[(target_y as isize + direction_y) as usize]
-                [(target_x as isize + direction_x) as usize]
-                == p.into()
-        {
+            s if s == (!p).into() => self.search(at, dir, p, len + 1),
+
             // len > 0 挟まれている色が検索によって存在するかつその先に指定された色があれば挟まれたと判定する
-            len
-        } else {
+            s if s == p.into() => len,
+
             // 何もなかった場合はReturn
-            0
+            _ => 0,
         }
     }
 
-    fn frip(&mut self, x: usize, y: usize, p: Player) {
-        for dir in [
-            [-1, -1],
-            [-1, 0],
-            [-1, 1],
-            [0, 1],
-            [1, 1],
-            [1, 0],
-            [1, -1],
-            [0, -1],
-        ] {
-            let len = self.search(x, y, dir[0], dir[1], p, 0);
-            let mut pos_x = x as isize;
-            let mut pos_y = y as isize;
-            for _ in 0..len {
-                pos_x += dir[0];
-                pos_y += dir[1];
-                self.state[pos_y as usize][pos_x as usize] = p.into();
-            }
-        }
-    }
+    fn frip(&mut self, c: Coordinate, p: Player) {
+        (-1..=1)
+            .map(|x| (-1..=1).map(move |y| (x, y)))
+            .flatten()
+            .map(|v| Vector::new(v.0, v.1))
+            .filter(|v| !v.is_zero())
+            .for_each(|dir| {
+                let len = self.search(c, dir, p, 0);
+                let mut c = c;
 
-    fn put_first_board(&mut self) {
-        self.put(3, 3, Player::First).unwrap();
-        self.put(4, 3, Player::Second).unwrap();
-        self.put(3, 4, Player::Second).unwrap();
-        self.put(4, 4, Player::First).unwrap();
+                for _ in 0..len {
+                    c = c.try_add(dir).unwrap();
+                    *self.get_cell_mut(c) = p.into();
+                }
+            });
     }
+}
 
-    fn print(&self) {
-        self.state.iter().for_each(|row| {
-            println!(" {}", row.map(|v| v.to_string()).join(" "));
-        });
+impl Display for Board {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}\n",
+            self.state
+                .iter()
+                .map(|row| row.map(|v| v.to_string()).join(" "))
+                .collect::<Vec<String>>()
+                .join("\n")
+        )
     }
 }
 
 fn main() {
     let mut board = Board::new();
-    board.put_first_board();
-    board.print();
+    println!("{board}");
 
     let mut p = Player::Second;
     loop {
-        let mut x = String::new();
-        std::io::stdin().read_line(&mut x).unwrap();
-        let mut y = String::new();
-        std::io::stdin().read_line(&mut y).unwrap();
+        let prompt = |name: &str| -> usize {
+            let mut s = String::new();
+            loop {
+                print!("{name}? ");
+                std::io::stdout().flush().unwrap();
+                std::io::stdin().read_line(&mut s).unwrap();
+                if let Ok(v) = s.trim().parse::<usize>() {
+                    return v;
+                }
+            }
+        };
 
-        let x = x.trim_end().to_owned().parse().unwrap_or(0);
-        let y = y.trim_end().to_owned().parse().unwrap_or(0);
-
-        println!("({x}, {y})");
-
-        if x > BOARD_SIZE - 1 || y > BOARD_SIZE - 1 {
-            println!("Out of range. Please select inside of BOARD_SIZE: {BOARD_SIZE}",);
+        let Ok(c) = Coordinate::try_new(prompt("x"), prompt("y")) else {
+            println!("Out of range. Please select inside of BOARD_SIZE: {BOARD_SIZE}");
             continue;
-        }
+        };
 
-        if !board.is_free_space(x, y).unwrap() {
+        println!("{c}");
+
+        if !board.get_cell(c).is_empty() {
             println!("This is not free space. Please select free space.");
             continue;
         }
 
-        board.put(x, y, p).unwrap();
-        board.print();
+        board.put(c, p).unwrap();
+        println!("{board}");
 
         p = !p;
     }
