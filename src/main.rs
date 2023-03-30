@@ -140,16 +140,18 @@ impl Board {
             return Err("Put point is not Empty.");
         }
 
-        *self.get_cell_mut(c) = p.into();
-
-        (-1..=1)
+        if !(-1..=1)
             .map(|x| (-1..=1).map(move |y| (x, y)))
             .flatten()
             .map(|v| Vector::new(v.0, v.1))
             .filter(|v| !v.is_zero())
-            .for_each(|dir| {
-                self.flip(c, dir, p);
-            });
+            .map(|dir| self.flip(c, dir, p))
+            .any(|v| v) {
+
+            return Err("Unexpected place");
+        }
+
+        *self.get_cell_mut(c) = p.into();
 
         Ok(())
     }
@@ -185,7 +187,7 @@ impl Display for Board {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{}\n",
+            "{}",
             self.state
                 .iter()
                 .map(|row| row.map(|v| v.to_string()).join(" "))
@@ -221,7 +223,7 @@ fn main() {
         println!("{c}");
 
         if board.put(c, p).is_err() {
-            println!("This is not free space. Please select free space.");
+            println!("This is not placable space. Please reselect space.");
             continue;
         }
 
