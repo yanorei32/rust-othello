@@ -222,12 +222,11 @@ fn main() {
 
         println!("{c}");
 
-        if !board.get_cell(c).is_empty() {
+        if board.put(c, p).is_err() {
             println!("This is not free space. Please select free space.");
             continue;
         }
 
-        board.put(c, p).unwrap();
         println!("{board}");
 
         p = !p;
