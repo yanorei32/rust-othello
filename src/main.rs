@@ -142,44 +142,42 @@ impl Board {
 
         *self.get_cell_mut(c) = p.into();
 
-        self.frip(c, p);
-
-        Ok(())
-    }
-
-    fn search(&self, at: Coordinate, dir: Vector, p: Player, len: usize) -> usize {
-        // 盤面の範囲外に出る際に検出してReturn
-        let Ok(at) = at.try_add(dir) else {
-            return 0;
-        };
-
-        match *self.get_cell(at) {
-            // 指定した色とは反対の色を探す.これで挟まれている色を探索する.
-            s if s == (!p).into() => self.search(at, dir, p, len + 1),
-
-            // len > 0 挟まれている色が検索によって存在するかつその先に指定された色があれば挟まれたと判定する
-            s if s == p.into() => len,
-
-            // 何もなかった場合はReturn
-            _ => 0,
-        }
-    }
-
-    fn frip(&mut self, c: Coordinate, p: Player) {
         (-1..=1)
             .map(|x| (-1..=1).map(move |y| (x, y)))
             .flatten()
             .map(|v| Vector::new(v.0, v.1))
             .filter(|v| !v.is_zero())
             .for_each(|dir| {
-                let len = self.search(c, dir, p, 0);
-                let mut c = c;
-
-                for _ in 0..len {
-                    c = c.try_add(dir).unwrap();
-                    *self.get_cell_mut(c) = p.into();
-                }
+                self.flip(c, dir, p);
             });
+
+        Ok(())
+    }
+
+    fn flip(&mut self, at: Coordinate, dir: Vector, p: Player) -> bool {
+        // 盤面の範囲外に出る際に検出してReturn
+        let Ok(at) = at.try_add(dir) else {
+            return false;
+        };
+
+        match *self.get_cell(at) {
+            // len > 0 挟まれている色が検索によって存在するかつその先に指定された色があれば挟まれたと判定する
+            s if s == p.into() => true,
+
+            // 指定した色とは反対の色を探す.これで挟まれている色を探索する.
+            s if s == (!p).into() => {
+                let found = self.flip(at, dir, p);
+
+                if found {
+                    *self.get_cell_mut(at) = p.into();
+                }
+
+                found
+            }
+
+            // 何もなかった場合はReturn
+            _ => false,
+        }
     }
 }
 
