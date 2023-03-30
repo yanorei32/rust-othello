@@ -146,7 +146,9 @@ impl Board {
             .map(|v| Vector::new(v.0, v.1))
             .filter(|v| !v.is_zero())
             .map(|dir| self.flip(c, dir, p))
-            .any(|v| v) {
+            .collect::<Vec<bool>>()
+            .iter()
+            .any(|&v| v) {
 
             return Err("Unexpected place");
         }
