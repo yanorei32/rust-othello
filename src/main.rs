@@ -12,7 +12,7 @@ use math::Coordinate;
 use othello::{Board, Player};
 
 fn main() {
-    let mut board: Board<3, 3> = Board::new();
+    let mut board: Board<8, 8> = Board::new();
     let mut p = Player::First;
 
     loop {
