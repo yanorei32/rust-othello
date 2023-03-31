@@ -14,7 +14,7 @@ use math::Coordinate;
 use othello::{Board, Player};
 
 fn main() {
-    let mut b: Board<6, 6> = Board::new();
+    let mut b: Board<8, 8> = Board::new();
     let mut p = Player::First;
 
     println!("Your Color {p}");
