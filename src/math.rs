@@ -55,6 +55,11 @@ impl<const SIZE_X: usize, const SIZE_Y: usize> Coordinate<SIZE_X, SIZE_Y> {
     pub const fn y(&self) -> usize {
         self.y
     }
+
+    #[inline]
+    pub const fn is_corner(&self) -> bool {
+        (self.x == 0 || self.x == (SIZE_X - 1)) && (self.y == 0 || self.y == (SIZE_Y - 1))
+    }
 }
 
 impl<const SIZE_X: usize, const SIZE_Y: usize> Display for Coordinate<SIZE_X, SIZE_Y> {

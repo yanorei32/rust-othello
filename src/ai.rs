@@ -5,8 +5,10 @@ pub fn think<const SIZE_X: usize, const SIZE_Y: usize>(
     b: &Board<SIZE_X, SIZE_Y>,
     p: Player,
 ) -> Option<Coordinate<SIZE_X, SIZE_Y>> {
-    (0..SIZE_Y)
-        .flat_map(|y| (0..SIZE_X).map(move |x| unsafe { Coordinate::try_new(x, y).unwrap_unchecked() }))
+    let candidate: Vec<(usize, Coordinate<SIZE_X, SIZE_Y>)> = (0..SIZE_Y)
+        .flat_map(|y| {
+            (0..SIZE_X).map(move |x| unsafe { Coordinate::try_new(x, y).unwrap_unchecked() })
+        })
         .filter(|&c| b.get_cell(c).is_empty())
         .map(|c| {
             (
@@ -19,6 +21,12 @@ pub fn think<const SIZE_X: usize, const SIZE_Y: usize>(
                 c,
             )
         })
-        .max_by_key(|v| v.0)
-        .map(|v| v.1)
+        .filter(|&(count, _)| count != 0)
+        .collect();
+
+    if let Some(c) = candidate.iter().find(|v| v.1.is_corner()).map(|v| v.1) {
+        Some(c)
+    } else {
+        candidate.iter().max_by_key(|v| v.0).map(|v| v.1)
+    }
 }

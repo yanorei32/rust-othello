@@ -4,6 +4,7 @@
 #![feature(is_some_and)]
 
 use std::io::Write;
+use std::cmp::Ordering;
 
 mod ai;
 mod math;
@@ -13,15 +14,14 @@ use math::Coordinate;
 use othello::{Board, Player};
 
 fn main() {
-    let mut board: Board<8, 8> = Board::new();
+    let mut b: Board<6, 6> = Board::new();
     let mut p = Player::First;
 
-    loop {
-        println!("{board}");
-        println!("Player: {p}");
+    println!("Your Color {p}");
 
-        if board.is_pass(p) {
-            if board.is_pass(!p) {
+    loop {
+        if b.is_pass(p) {
+            if b.is_pass(!p) {
                 // game set!
                 break;
             }
@@ -32,10 +32,12 @@ fn main() {
         }
 
         if p == Player::Second {
-            board.put(ai::think(&board, p).unwrap(), p).unwrap();
+            b.put(ai::think(&b, p).unwrap(), p).unwrap();
             p = !p;
             continue;
         }
+
+        println!("{b}");
 
         let prompt = |name: &str| -> usize {
             let mut s = String::new();
@@ -54,7 +56,7 @@ fn main() {
             continue;
         };
 
-        if let Err(e) = board.put(c, p) {
+        if let Err(e) = b.put(c, p) {
             println!("{e}");
             continue;
         }
@@ -62,18 +64,21 @@ fn main() {
         p = !p;
     }
 
-    let stat = board.stat();
-    print!("{}: {} ", Player::First, stat.first);
-    print!("{}: {} ", Player::Second, stat.second);
+    let s = b.stat();
+    print!("{}: {} ", Player::First, s.first);
+    print!("{}: {} ", Player::Second, s.second);
 
-    match usize::cmp(&stat.first, &stat.second) {
-        std::cmp::Ordering::Greater => println!("{} Win!", Player::First),
-        std::cmp::Ordering::Equal => println!("DRAW!"),
-        std::cmp::Ordering::Less => println!("{} Win!", Player::Second),
+    match usize::cmp(&s.first, &s.second) {
+        Ordering::Greater => println!("{} Win!", Player::First),
+        Ordering::Equal => println!("DRAW!"),
+        Ordering::Less => println!("{} Win!", Player::Second),
     }
 
-    let w = board.record().len().to_string().len();
-    for (n, (p, c)) in board.record().iter().enumerate() {
+    println!();
+    println!("{b}");
+
+    let w = b.record().len().to_string().len();
+    for (n, (p, c)) in b.record().iter().enumerate() {
         println!("{n:>w$} {p} {c}");
     }
 }
