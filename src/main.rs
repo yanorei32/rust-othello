@@ -1,8 +1,12 @@
+#![feature(result_option_inspect)]
+#![feature(slice_flatten)]
+#![feature(is_some_and)]
+
 use std::fmt::Display;
 use std::io::Write;
 use std::ops::Not;
 
-const BOARD_SIZE: usize = 8;
+const BOARD_SIZE: usize = 3;
 
 #[derive(Debug, Clone, Copy)]
 struct Vector {
@@ -30,7 +34,7 @@ impl Coordinate {
     #[must_use]
     fn try_new(x: usize, y: usize) -> Result<Self, &'static str> {
         if !(0..BOARD_SIZE).contains(&x) || !(0..BOARD_SIZE).contains(&y) {
-            return Err("Invalid coordinate");
+            return Err("Invalid Coordinate");
         }
 
         Ok(Self { x, y })
@@ -50,12 +54,6 @@ impl Coordinate {
         };
 
         Self::try_new(add_isize(self.x, v.x)?, add_isize(self.y, v.y)?)
-    }
-}
-
-impl Display for Coordinate {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "({}, {})", self.x, self.y)
     }
 }
 
@@ -108,21 +106,24 @@ impl Display for CellState {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 struct Board {
     state: [[CellState; BOARD_SIZE]; BOARD_SIZE],
+    record: Vec<(Player, Coordinate)>,
 }
 
 impl Board {
     fn new() -> Self {
         let mut b = Self {
             state: [[CellState::Empty; BOARD_SIZE]; BOARD_SIZE],
+            record: Vec::new(),
         };
 
-        b.state[3][3] = Player::First.into();
-        b.state[3][4] = Player::Second.into();
-        b.state[4][3] = Player::Second.into();
-        b.state[4][4] = Player::First.into();
+        let n = BOARD_SIZE / 2;
+        b.state[n - 1][n - 1] = Player::First.into();
+        b.state[n - 1][n] = Player::Second.into();
+        b.state[n][n - 1] = Player::Second.into();
+        b.state[n][n] = Player::First.into();
 
         b
     }
@@ -137,74 +138,125 @@ impl Board {
 
     fn put(&mut self, c: Coordinate, p: Player) -> Result<(), &'static str> {
         if !self.get_cell(c).is_empty() {
-            return Err("Put point is not Empty.");
+            return Err("Cell is not Empty.");
         }
 
         if !(-1..=1)
-            .map(|x| (-1..=1).map(move |y| (x, y)))
+            .map(|x| (-1..=1).map(move |y| Vector::new(x, y)))
             .flatten()
-            .map(|v| Vector::new(v.0, v.1))
             .filter(|v| !v.is_zero())
             .map(|dir| self.flip(c, dir, p))
-            .collect::<Vec<bool>>()
+            .collect::<Vec<Result<usize, ()>>>()
             .iter()
-            .any(|&v| v) {
-
-            return Err("Unexpected place");
+            .any(|&v| v.is_ok_and(|v| 0 < v))
+        {
+            return Err("Cell is not placable");
         }
 
         *self.get_cell_mut(c) = p.into();
+        self.record.push((p, c));
 
         Ok(())
     }
 
-    fn flip(&mut self, at: Coordinate, dir: Vector, p: Player) -> bool {
-        // 盤面の範囲外に出る際に検出してReturn
-        let Ok(at) = at.try_add(dir) else {
-            return false;
-        };
-
+    fn flip(&mut self, at: Coordinate, dir: Vector, p: Player) -> Result<usize, ()> {
+        // is wall?
+        let at = at.try_add(dir).map_err(|_| ())?;
         match *self.get_cell(at) {
-            // len > 0 挟まれている色が検索によって存在するかつその先に指定された色があれば挟まれたと判定する
-            s if s == p.into() => true,
+            CellState::Empty => Err(()),
+            s if s == p.into() => Ok(0),
+            s if s == (!p).into() => self
+                .flip(at, dir, p)
+                .map(|v| v + 1)
+                .inspect(|_| *self.get_cell_mut(at) = p.into()),
+            _ => unreachable!(),
+        }
+    }
 
-            // 指定した色とは反対の色を探す.これで挟まれている色を探索する.
-            s if s == (!p).into() => {
-                let found = self.flip(at, dir, p);
+    fn is_pass(&self, p: Player) -> bool {
+        (0..BOARD_SIZE)
+            .map(|y| {
+                (0..BOARD_SIZE)
+                    .map(move |x| unsafe { Coordinate::try_new(x, y).unwrap_unchecked() })
+            })
+            .flatten()
+            .filter(|&c| self.get_cell(c).is_empty())
+            .filter(|&c| {
+                (-1..=1)
+                    .map(|x| (-1..=1).map(move |y| Vector::new(x, y)))
+                    .flatten()
+                    .filter(|v| !v.is_zero())
+                    .map(|dir| self.flipable(c, dir, p))
+                    .any(|v| v.is_ok_and(|v| 0 < v))
+            })
+            .next()
+            .is_none()
+    }
 
-                if found {
-                    *self.get_cell_mut(at) = p.into();
-                }
-
-                found
-            }
-
-            // 何もなかった場合はReturn
-            _ => false,
+    fn flipable(&self, at: Coordinate, dir: Vector, p: Player) -> Result<usize, ()> {
+        // is wall?
+        let at = at.try_add(dir).map_err(|_| ())?;
+        match *self.get_cell(at) {
+            CellState::Empty => Err(()),
+            s if s == p.into() => Ok(0),
+            s if s == (!p).into() => self.flipable(at, dir, p).map(|v| v + 1),
+            _ => unreachable!(),
         }
     }
 }
 
+
 impl Display for Board {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            self.state
-                .iter()
-                .map(|row| row.map(|v| v.to_string()).join(" "))
-                .collect::<Vec<String>>()
-                .join("\n")
-        )
+        let width = (BOARD_SIZE - 1).to_string().len();
+
+        write!(f, "{:^width$} ", "", width = width)?;
+
+        for n in 0..BOARD_SIZE {
+            write!(f, "{:^width$} ", n, width = width)?;
+        }
+
+        writeln!(f)?;
+
+        for y in 0..BOARD_SIZE {
+            write!(f, "{y:>width$} ", width = width)?;
+
+            for x in 0..BOARD_SIZE {
+                let c = unsafe { Coordinate::try_new(x, y).unwrap_unchecked() };
+                write!(
+                    f,
+                    "{:^width$} ",
+                    (*self.get_cell(c)).to_string(),
+                    width = width
+                )?;
+            }
+
+            writeln!(f)?;
+        }
+
+        Ok(())
     }
 }
 
 fn main() {
     let mut board = Board::new();
-    println!("{board}");
-
     let mut p = Player::Second;
+
     loop {
+        p = !p;
+        println!("{board}");
+        println!("Player: {}", CellState::from(p));
+
+        if board.is_pass(p) {
+            if board.is_pass(!p) {
+                println!("GameSet!");
+                break;
+            }
+
+            println!("PASS!");
+            continue;
+        }
+
         let prompt = |name: &str| -> usize {
             let mut s = String::new();
             loop {
@@ -222,15 +274,13 @@ fn main() {
             continue;
         };
 
-        println!("{c}");
-
-        if board.put(c, p).is_err() {
-            println!("This is not placable space. Please reselect space.");
+        if let Err(e) = board.put(c, p) {
+            println!("{e}");
             continue;
         }
+    }
 
-        println!("{board}");
-
-        p = !p;
+    for (p, c) in board.record {
+        println!("{}: {:?}", CellState::from(p), c);
     }
 }
