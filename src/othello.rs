@@ -23,8 +23,8 @@ impl Not for Player {
 impl Display for Player {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Player::First => write!(f, "○"),
-            Player::Second => write!(f, "●"),
+            Self::First => write!(f, "○"),
+            Self::Second => write!(f, "●"),
         }
     }
 }
@@ -37,16 +37,16 @@ pub enum CellState {
 }
 
 impl CellState {
-    pub fn is_empty(&self) -> bool {
-        *self == Self::Empty
+    pub fn is_empty(self) -> bool {
+        self == Self::Empty
     }
 }
 
 impl From<Player> for CellState {
     fn from(p: Player) -> Self {
         match p {
-            Player::First => CellState::First,
-            Player::Second => CellState::Second,
+            Player::First => Self::First,
+            Player::Second => Self::Second,
         }
     }
 }
@@ -54,9 +54,9 @@ impl From<Player> for CellState {
 impl Display for CellState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            CellState::Empty => write!(f, "-"),
-            CellState::First => write!(f, "○"),
-            CellState::Second => write!(f, "●"),
+            Self::Empty => write!(f, "-"),
+            Self::First => write!(f, "○"),
+            Self::Second => write!(f, "●"),
         }
     }
 }
@@ -109,7 +109,7 @@ impl<const SIZE_X: usize, const SIZE_Y: usize> Board<SIZE_X, SIZE_Y> {
     }
 
     #[inline]
-    pub fn get_cell(&self, c: Coordinate<SIZE_X, SIZE_Y>) -> &CellState {
+    pub const fn get_cell(&self, c: Coordinate<SIZE_X, SIZE_Y>) -> &CellState {
         &self.state[c.y()][c.x()]
     }
 
@@ -119,8 +119,7 @@ impl<const SIZE_X: usize, const SIZE_Y: usize> Board<SIZE_X, SIZE_Y> {
         }
 
         if !(-1..=1)
-            .map(|x| (-1..=1).map(move |y| Vector::new(x, y)))
-            .flatten()
+            .flat_map(|x| (-1..=1).map(move |y| Vector::new(x, y)))
             .filter(|v| !v.is_zero())
             .map(|dir| self.flip(c, dir, p))
             .collect::<Vec<Result<usize, ()>>>()
@@ -157,21 +156,17 @@ impl<const SIZE_X: usize, const SIZE_Y: usize> Board<SIZE_X, SIZE_Y> {
 
     pub fn is_pass(&self, p: Player) -> bool {
         (0..SIZE_Y)
-            .map(|y| {
+            .flat_map(|y| {
                 (0..SIZE_X).map(move |x| unsafe { Coordinate::try_new(x, y).unwrap_unchecked() })
             })
-            .flatten()
             .filter(|&c| self.get_cell(c).is_empty())
-            .filter(|&c| {
+            .any(|c| {
                 (-1..=1)
-                    .map(|x| (-1..=1).map(move |y| Vector::new(x, y)))
-                    .flatten()
+                    .flat_map(|x| (-1..=1).map(move |y| Vector::new(x, y)))
                     .filter(|v| !v.is_zero())
                     .map(|dir| self.flipable(c, dir, p))
                     .any(|v| v.is_ok_and(|v| 0 < v))
             })
-            .next()
-            .is_none()
     }
 
     pub fn flipable(
@@ -190,30 +185,30 @@ impl<const SIZE_X: usize, const SIZE_Y: usize> Board<SIZE_X, SIZE_Y> {
         }
     }
 
-    pub fn record(&self) -> &Vec<(Player, Coordinate<SIZE_X, SIZE_Y>)> {
+    pub const fn record(&self) -> &Vec<(Player, Coordinate<SIZE_X, SIZE_Y>)> {
         &self.record
     }
 }
 
 impl<const SIZE_X: usize, const SIZE_Y: usize> Display for Board<SIZE_X, SIZE_Y> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let x_width = (SIZE_X - 1).to_string().len();
-        let y_width = (SIZE_Y - 1).to_string().len();
+        let wx = (SIZE_X - 1).to_string().len();
+        let wy = (SIZE_Y - 1).to_string().len();
 
-        write!(f, "{:^w$} ", "", w = y_width)?;
+        write!(f, "{:^wy$} ", "")?;
 
         for n in 0..SIZE_X {
-            write!(f, "{:^w$} ", n, w = x_width)?;
+            write!(f, "{n:^wx$} ")?;
         }
 
         writeln!(f)?;
 
         for y in 0..SIZE_Y {
-            write!(f, "{y:>w$} ", w = y_width)?;
+            write!(f, "{y:>wy$} ")?;
 
             for x in 0..SIZE_X {
                 let c = unsafe { Coordinate::try_new(x, y).unwrap_unchecked() };
-                write!(f, "{:^w$} ", (*self.get_cell(c)).to_string(), w = x_width)?;
+                write!(f, "{:^wx$} ", (*self.get_cell(c)).to_string())?;
             }
 
             writeln!(f)?;

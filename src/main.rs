@@ -1,3 +1,4 @@
+#![warn(clippy::pedantic, clippy::nursery)]
 #![feature(result_option_inspect)]
 #![feature(slice_flatten)]
 #![feature(is_some_and)]
@@ -17,7 +18,7 @@ fn main() {
 
     loop {
         println!("{board}");
-        println!("Player: {}", p);
+        println!("Player: {p}");
 
         if board.is_pass(p) {
             if board.is_pass(!p) {
@@ -66,13 +67,13 @@ fn main() {
     print!("{}: {} ", Player::Second, stat.second);
 
     match usize::cmp(&stat.first, &stat.second) {
-        std::cmp::Ordering::Greater=> println!("{} Win!", Player::First),
+        std::cmp::Ordering::Greater => println!("{} Win!", Player::First),
         std::cmp::Ordering::Equal => println!("DRAW!"),
         std::cmp::Ordering::Less => println!("{} Win!", Player::Second),
     }
 
     let w = board.record().len().to_string().len();
     for (n, (p, c)) in board.record().iter().enumerate() {
-        println!("{n:>w$} {p} {c}", w = w);
+        println!("{n:>w$} {p} {c}");
     }
 }

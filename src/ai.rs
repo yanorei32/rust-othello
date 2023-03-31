@@ -6,17 +6,15 @@ pub fn think<const SIZE_X: usize, const SIZE_Y: usize>(
     p: Player,
 ) -> Option<Coordinate<SIZE_X, SIZE_Y>> {
     (0..SIZE_Y)
-        .map(|y| (0..SIZE_X).map(move |x| unsafe { Coordinate::try_new(x, y).unwrap_unchecked() }))
-        .flatten()
+        .flat_map(|y| (0..SIZE_X).map(move |x| unsafe { Coordinate::try_new(x, y).unwrap_unchecked() }))
         .filter(|&c| b.get_cell(c).is_empty())
         .map(|c| {
             (
                 (-1..=1)
-                    .map(|x| (-1..=1).map(move |y| Vector::new(x, y)))
-                    .flatten()
+                    .flat_map(|x| (-1..=1).map(move |y| Vector::new(x, y)))
                     .filter(|v| !v.is_zero())
                     .map(|dir| b.flipable(c, dir, p))
-                    .filter_map(|b| b.ok())
+                    .filter_map(std::result::Result::ok)
                     .sum::<usize>(),
                 c,
             )
