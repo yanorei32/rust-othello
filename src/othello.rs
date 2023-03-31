@@ -155,7 +155,7 @@ impl<const SIZE_X: usize, const SIZE_Y: usize> Board<SIZE_X, SIZE_Y> {
     }
 
     pub fn is_pass(&self, p: Player) -> bool {
-        (0..SIZE_Y)
+        !(0..SIZE_Y)
             .flat_map(|y| {
                 (0..SIZE_X).map(move |x| unsafe { Coordinate::try_new(x, y).unwrap_unchecked() })
             })
