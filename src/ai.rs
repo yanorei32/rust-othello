@@ -24,9 +24,9 @@ pub fn think<const SIZE_X: usize, const SIZE_Y: usize>(
         .filter(|&(count, _)| count != 0)
         .collect();
 
-    if let Some(c) = candidate.iter().find(|v| v.1.is_corner()).map(|v| v.1) {
-        Some(c)
-    } else {
-        candidate.iter().max_by_key(|v| v.0).map(|v| v.1)
-    }
+    candidate
+        .iter()
+        .find(|v| v.1.is_corner())
+        .or_else(|| candidate.iter().max_by_key(|v| v.0))
+        .map(|v| v.1)
 }
